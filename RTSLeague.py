@@ -3,11 +3,14 @@
 Created on Mon Sep  7 22:19:04 2020
 
 @author: Briggs
-https://docs.google.com/spreadsheets/d/e/2PACX-1vSFim9JZWYDHCB8YwJnCG2T1yKhTgas750EbM7vnraXI1g5hFnsEY3QjNepYoFpKitUizzQbbUhAHzm/pub?output=csv
+some usefule links:
+Average draft position (ADP) - 'https://fantasyfootballcalculator.com/api/v1/adp/standard?teams=8&year=2019'
+Expert consensus Rankings - 'https://partners.fantasypros.com/api/v1/consensus-rankings.php?sport=NFL&year=2019&week=0&id=1054&position=ALL&type=ST&scoring=HALF&filters=1:2:3:4:5:7:8:9:285:699&export=json'
 
 """
 
 import requests
+
 import datetime
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -21,7 +24,7 @@ slotvalues = {}
 for slotid in slotnames:
     slotvalues[slotnames[slotid]]=slotid
     
-    
+
 
 
 class privateLeague():
@@ -56,13 +59,17 @@ class privateLeague():
         self.setCurrentWeek()
         print('Getting Rosters')
         self.Rosters = self.getRosters(self.CurrentWeek)
+        self.Rankings = self.getROSECR()
         self.MyRoster = self.Rosters[self.Rosters['ffl-team']==self.MyTeamName]
         print('Getting Player Data')
         self.Players = self.getPlayerData()
-        self.Players = self.Players.merge(self.Rosters,how='outer')
-        self.Players.sort_values(by='Rank',inplace=True)
+        self.Players = pd.merge(self.Players,self.Rosters,how='outer',on='Player')
+        self.Players = pd.merge(self.Players,self.Rankings,how='outer',on='Player')
+        self.Players = pd.merge(self.Players,self.getWeeklyECR(),how='outer',on='Player')
+        self.Players.sort_values(by='rank_ecr',inplace=True)
         print('Getting Rankings')
-        self.Rankings = self.getRankings()
+        
+        
 
     #%% SET VALUES
         
@@ -95,8 +102,9 @@ class privateLeague():
 
         data = pd.read_csv(StringIO(data))
         data.columns = ['ffl-team','Player','Position','nfl-team','Roster Status','']
+        data.drop(columns=['','Position','nfl-team'], inplace=True)
         data = data.set_index('Player')
-        del data['']
+        data.index = data.index.str.replace(' II','')
         return data
     
     def getPlayerData(self):
@@ -112,7 +120,13 @@ class privateLeague():
             data = pd.read_csv(StringIO(data))
             data = data.iloc[:,0:10]
             data.columns = ["Rank","Player","Position","nfl-team","Bye","injury","ffl-team","pts","avg","avg-3wk"]
+            data.drop(columns=['ffl-team'], inplace=True)
             data = data.set_index('Player')
+            data.index = data.index.str.replace(' II','')
+            data.index = data.index.str.replace(' V','')
+            data.index = data.index.str.replace(' IV','')
+            data.index = data.index.str.replace(' Jr.','')
+            data.index = data.index.str.replace('  ',' ')
             players = players.append(data)
             
             
@@ -120,49 +134,164 @@ class privateLeague():
     
     
     
-    
-    
+   
     
     #%% FREE AGENT STUFF
    
     #%%  RANKINGS
-    def getRankings(self):
-        QBURL = 'https://www.fantasypros.com/nfl/rankings/qb.php'
-        RBURL = 'https://www.espn.com/fantasy/football/story/_/page/WeeklyRanks2020RBPPR'
-        KURL = 'https://www.espn.com/fantasy/football/story/_/page/WeeklyRanks2020KPPR/fantasy-football-weekly-kicker-rankings-2020'
-        DEFURL = 'https://www.espn.com/fantasy/football/story/_/page/WeeklyRanks2020DSTPPR/fantasy-football-weekly-d-st-rankings-2020'
-        WRURL = 'https://www.espn.com/fantasy/football/story/_/page/WeeklyRanks2020WRPPR/fantasy-football-weekly-wide-receiver-ppr-rankings-2020'
-        TEURL = 'https://www.espn.com/fantasy/football/story/_/page/WeeklyRanks2020TEPPR/fantasy-football-weekly-tight-ends-ppr-rankings-2020'
-        urls = [QBURL]
-        #urls = [QBURL,RBURL,KURL,DEFURL,WRURL,TEURL]
-        rankings = pd.DataFrame()
 
-        for url in urls:
-            
-            html = requests.get(url)
-            
-            if html == None:
-                print("Failed to get Rankings Data")
-            
-            soup = BeautifulSoup(html.content, 'html.parser')
-           
-            rankingsraw = soup.find_all(class_='player-row')
-           
-        return rankings
+    
+    def getROSECR(self):
+        '''
+        valid position codes:
+            "QB, RB, WR, TE, K, OP, FLX, DST, IDP, DL, LB, DB, TK, TQB, TRB, TWR, TTE, TOL, HC, P"}
         
+        Valid type codes:
+                ST, weekly, Draft Half PPR, ROS
+                ROS will give rest of season rankings
+                weekly will give just this week
+                I am not sure what the type is for?
+                
+        id: 1054
+        
+        Unused params
+        'filters':'1:2:3:4:5:7:8:9:285:699',
+            not sure what the filters mean
+    Returns
+        -------
+        ecr : TYPE
+            DESCRIPTION.
+
+        '''
+        
+        rankings = pd.DataFrame()
+        positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
+        
+        for position in positions:
+            params = {'sport':'NFL','year':self.year,'week':0,
+                      'position':position,'id':1054,'type':'ROS',"ranking_type_name":"ros",'scoring':'PPR',
+                      'export':'json'}
+            
+            url ='https://partners.fantasypros.com/api/v1/consensus-rankings.php' #?sport=NFL&year=2020&week=0&id=1054&position=ALL&type=ST&scoring=HALF&filters=1:2:3:4:5:7:8:9:285:699&export=json'
+            
+                
+            data = requests.get(url,params=params)
+            
+            ecr = data.json()
+            positionrankings = pd.DataFrame(ecr['players'])
+            rankings = rankings.append(positionrankings)
+        
+        rankings.drop(columns=['player_id',  'sportsdata_id', 
+        'player_yahoo_positions', 'player_page_url','player_short_name',
+        'player_positions','player_filename', 'player_square_image_url',
+        'player_image_url','player_yahoo_id', 'cbs_player_id',
+        'player_bye_week','note','player_owned_yahoo','player_owned_espn',
+        'player_position_id','player_eligibility','player_eligibility'], inplace=True )
+        
+        rankings.rename(columns={'player_name':'Player'},inplace=True)
+        rankings = rankings.set_index('Player')
+        #Sanitize some data
+        rankings.index = rankings.index.str.replace(' II','')
+        rankings.index = rankings.index.str.replace(' V','')
+        rankings.index = rankings.index.str.replace(' IV','')
+        rankings.index = rankings.index.str.replace(' Jr.','')
+        rankings.index = rankings.index.str.replace('  ',' ')
+        return rankings
+    
+    def getWeeklyECR(self):
+        '''
+        valid position codes:
+            "QB, RB, WR, TE, K, OP, FLX, DST, IDP, DL, LB, DB, TK, TQB, TRB, TWR, TTE, TOL, HC, P"}
+        
+        Valid type codes:
+                ST, weekly, Draft Half PPR, ROS
+                ROS will give rest of season rankings
+                weekly will give just this week
+                I am not sure what the type is for?
+                
+        id: 1054
+        
+        Unused params
+        'filters':'1:2:3:4:5:7:8:9:285:699',
+            not sure what the filters mean
+    Returns
+        -------
+        ecr : TYPE
+            DESCRIPTION.
+
+        '''
+        
+        rankings = pd.DataFrame()
+        positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
+        
+        for position in positions:
+            params = {'sport':'NFL','year':self.year,'week':self.CurrentWeek,
+                      'position':position,'id':1054,'type':'weekly',"ranking_type_name":"ros",'scoring':'PPR',
+                      'export':'json'}
+            
+            url ='https://partners.fantasypros.com/api/v1/consensus-rankings.php' #?sport=NFL&year=2020&week=0&id=1054&position=ALL&type=ST&scoring=HALF&filters=1:2:3:4:5:7:8:9:285:699&export=json'
+            
+                
+            data = requests.get(url,params=params)
+            
+            ecr = data.json()
+            positionrankings = pd.DataFrame(ecr['players'])
+            rankings = rankings.append(positionrankings)
+        print(rankings.columns)
+        rankings.drop(columns=['player_id',  'sportsdata_id', 
+        'player_yahoo_positions', 'player_page_url','player_short_name',
+        'player_positions','player_filename', 'player_square_image_url',
+        'player_image_url','player_yahoo_id', 'cbs_player_id',
+        'player_bye_week','note','player_owned_yahoo','player_owned_espn',
+        'player_position_id','player_eligibility','player_eligibility'], inplace=True )
+        
+        rankings.rename(columns={'player_name':'Player',
+                                 'r2p_pts':'Weekly Projection',
+                                 'rank_ecr':'Weekly ECR'},inplace=True)
+        
+        rankings = rankings.set_index('Player')
+        rankings.index = rankings.index.str.replace(' II','')
+        rankings.index = rankings.index.str.replace(' V','')
+        rankings.index = rankings.index.str.replace(' IV','')
+        rankings.index = rankings.index.str.replace(' Jr.','')
+        rankings.index = rankings.index.str.replace('  ',' ')
+        rankings = rankings[['Weekly Projection',
+                             'Weekly ECR',
+                             'start_sit_grade']]
+
+        
+        return rankings
         
     #%%  SCRIPTS
         
         
+    def getBestAvailable(self,Pos):
+            
+        Best = self.Players.loc[(self.Players['Position']==Pos)&
+                     (self.Players['ffl-team'].isnull())]
         
+        return Best.iloc[0]
+    
+    def positionalAnalysis(self,Pos):
+            
+        df = self.Players.loc[(self.Players['Position']==Pos)]
+        print(df)
+        df = df.loc[((df['ffl-team'].isnull()) | 
+                      (df['ffl-team']==self.MyTeamName)),
+                    ['ffl-team','rank_ecr','Weekly Projection']]
         
+        return df.head(20)
+    
+    def getMyWorst(self,Pos):
+        df = self.Players.loc[(self.Players['ffl-team']==self.MyTeamName)&(self.Players['Position']==Pos)]
+        Worst = df.loc[df['rank_ecr']==df['rank_ecr'].max()]
+        
+        return Worst
         
         #%% Archive methods
 '''
      def getLineup(self):
-       data = requests.get(self.url +'football/lineup.php',
-                           params=self.parameters,
-                           cookies=self.cookies)
+       data = requests.get('https://www.fantasypros.com/nfl/rankings/ros-ppr-rb.php')
        if data == None:
            print("Failed to get Lineup Data")
            
@@ -220,3 +349,6 @@ class privateLeague():
            #print(name.text)
         return team
 '''   
+
+
+
