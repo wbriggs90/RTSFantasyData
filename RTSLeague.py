@@ -55,18 +55,22 @@ class privateLeague():
         self.boxscore = None
         self.season = Season
         self.MyTeamName = MyTeamName
+        print()
         print('Getting the current Week')
         self.setCurrentWeek()
+        print()
         print('Getting Rosters')
         self.Rosters = self.getRosters(self.CurrentWeek)
         self.Rankings = self.getROSECR()
         self.MyRoster = self.Rosters[self.Rosters['ffl-team']==self.MyTeamName]
+        print()
         print('Getting Player Data')
         self.Players = self.getPlayerData()
         self.Players = pd.merge(self.Players,self.Rosters,how='outer',on='Player')
         self.Players = pd.merge(self.Players,self.Rankings,how='outer',on='Player')
         self.Players = pd.merge(self.Players,self.getWeeklyECR(),how='outer',on='Player')
         self.Players.sort_values(by='rank_ecr',inplace=True)
+        print()
         print('Getting Rankings')
         
         
@@ -90,6 +94,20 @@ class privateLeague():
     #%% GET RTS DATA
    
     def getRosters(self,Week):
+        '''
+        
+
+        Parameters
+        ----------
+        Week : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        data : TYPE
+            DESCRIPTION.
+
+        '''
 
         csvparams={'CID':0,'FWK':Week,'CSV':'YES'}
         csvparams.update(self.parameters)
@@ -99,8 +117,9 @@ class privateLeague():
                            cookies=self.cookies).text
    
         
-
-        data = pd.read_csv(StringIO(data))
+        
+        data = pd.read_csv(StringIO(data),skiprows=0,header=None)
+        print(data)
         data.columns = ['ffl-team','Player','Position','nfl-team','Roster Status','']
         data.drop(columns=['','Position','nfl-team'], inplace=True)
         data = data.set_index('Player')
@@ -108,6 +127,15 @@ class privateLeague():
         return data
     
     def getPlayerData(self):
+        '''
+        Gets all players including free agents from RTS site
+
+        Returns
+        -------
+        players : TYPE
+            DESCRIPTION.
+
+        '''
         players = pd.DataFrame()
         for Position in slotnames:
             csvparams={'CONF':0,'CSV':'YES','POS':Position, 'STATS':'FFL','TEAM':-1,'SEASON': self.season}
@@ -275,7 +303,7 @@ class privateLeague():
     def positionalAnalysis(self,Pos):
             
         df = self.Players.loc[(self.Players['Position']==Pos)]
-        print(df)
+        #print(df)
         df = df.loc[((df['ffl-team'].isnull()) | 
                       (df['ffl-team']==self.MyTeamName)),
                     ['ffl-team','rank_ecr','Weekly Projection']]
@@ -287,6 +315,9 @@ class privateLeague():
         Worst = df.loc[df['rank_ecr']==df['rank_ecr'].max()]
         
         return Worst
+    
+    def saveAllData(self):
+        self.Players.to_csv("data.csv")
         
         #%% Archive methods
 '''
