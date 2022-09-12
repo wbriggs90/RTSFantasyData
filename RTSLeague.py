@@ -19,10 +19,7 @@ import urllib.parse
 from io import StringIO
 
 
-slotnames = { 0:'QB', 1:'RB', 2:'WR', 3:'TE', 5:'DEF', 4:'KICKER'}
-slotvalues = {}
-for slotid in slotnames:
-    slotvalues[slotnames[slotid]]=slotid
+
     
 
 
@@ -48,6 +45,11 @@ class privateLeague():
                            'X':X}
         self.cookies =  {'REALTIME':REALTIME}
         self.scoreboard = [None] * 16
+        
+        self.slotnames = { 0:'QB', 1:'RB', 2:'WR', 3:'TE', 5:'DEF', 4:'KICKER'}
+        self.slotvalues = {}
+        for slotid in self.slotnames:
+            self.slotvalues[self.slotnames[slotid]]=slotid
         self.rosters = {}
         self.teams = {}
         self.rosterFormat = {}
@@ -119,11 +121,15 @@ class privateLeague():
         
         
         data = pd.read_csv(StringIO(data),skiprows=0,header=None)
-        print(data)
+        #print(data)
         data.columns = ['ffl-team','Player','Position','nfl-team','Roster Status','']
         data.drop(columns=['','Position','nfl-team'], inplace=True)
         data = data.set_index('Player')
-        data.index = data.index.str.replace(' II','')
+        data.index = data.index.str.replace(' II','',regex=True)
+        data.index = data.index.str.replace(' V','',regex=True)
+        data.index = data.index.str.replace(' IV','',regex=True)
+        data.index = data.index.str.replace(' Jr.','',regex=True)
+        data.index = data.index.str.replace('  ',' ',regex=True)
         return data
     
     def getPlayerData(self):
@@ -137,7 +143,7 @@ class privateLeague():
 
         '''
         players = pd.DataFrame()
-        for Position in slotnames:
+        for Position in self.slotnames:
             csvparams={'CONF':0,'CSV':'YES','POS':Position, 'STATS':'FFL','TEAM':-1,'SEASON': self.season}
             csvparams.update(self.parameters)
 
@@ -150,11 +156,11 @@ class privateLeague():
             data.columns = ["Rank","Player","Position","nfl-team","Bye","injury","ffl-team","pts","avg","avg-3wk"]
             data.drop(columns=['ffl-team'], inplace=True)
             data = data.set_index('Player')
-            data.index = data.index.str.replace(' II','')
-            data.index = data.index.str.replace(' V','')
-            data.index = data.index.str.replace(' IV','')
-            data.index = data.index.str.replace(' Jr.','')
-            data.index = data.index.str.replace('  ',' ')
+            data.index = data.index.str.replace(' II','',regex=True)
+            data.index = data.index.str.replace(' V','',regex=True)
+            data.index = data.index.str.replace(' IV','',regex=True)
+            data.index = data.index.str.replace(' Jr.','',regex=True)
+            data.index = data.index.str.replace('  ',' ',regex=True)
             players = players.append(data)
             
             
@@ -219,11 +225,11 @@ class privateLeague():
         rankings.rename(columns={'player_name':'Player'},inplace=True)
         rankings = rankings.set_index('Player')
         #Sanitize some data
-        rankings.index = rankings.index.str.replace(' II','')
-        rankings.index = rankings.index.str.replace(' V','')
-        rankings.index = rankings.index.str.replace(' IV','')
-        rankings.index = rankings.index.str.replace(' Jr.','')
-        rankings.index = rankings.index.str.replace('  ',' ')
+        rankings.index = rankings.index.str.replace(' II','',regex=True)
+        rankings.index = rankings.index.str.replace(' V','',regex=True)
+        rankings.index = rankings.index.str.replace(' IV','',regex=True)
+        rankings.index = rankings.index.str.replace(' Jr.','',regex=True)
+        rankings.index = rankings.index.str.replace('  ',' ',regex=True)
         return rankings
     
     def getWeeklyECR(self):
@@ -278,11 +284,11 @@ class privateLeague():
                                  'rank_ecr':'Weekly ECR'},inplace=True)
         
         rankings = rankings.set_index('Player')
-        rankings.index = rankings.index.str.replace(' II','')
-        rankings.index = rankings.index.str.replace(' V','')
-        rankings.index = rankings.index.str.replace(' IV','')
-        rankings.index = rankings.index.str.replace(' Jr.','')
-        rankings.index = rankings.index.str.replace('  ',' ')
+        rankings.index = rankings.index.str.replace(' II','',regex=True)
+        rankings.index = rankings.index.str.replace(' V','',regex=True)
+        rankings.index = rankings.index.str.replace(' IV','',regex=True)
+        rankings.index = rankings.index.str.replace(' Jr.','',regex=True)
+        rankings.index = rankings.index.str.replace('  ',' ',regex=True)
         rankings = rankings[['Weekly Projection',
                              'Weekly ECR',
                              'start_sit_grade']]
@@ -316,8 +322,8 @@ class privateLeague():
         
         return Worst
     
-    def saveAllData(self):
-        self.Players.to_csv("data.csv")
+    def saveAllData(self,filename):
+        self.Players.to_csv(filename)
         
         #%% Archive methods
 '''
