@@ -20,7 +20,16 @@ from io import StringIO
 
 
 
-    
+
+class ConfigError(Exception):
+    pass
+
+
+
+
+
+
+
 
 
 
@@ -35,7 +44,24 @@ class privateLeague():
     
     #teams = {}
       
-    def __init__(self, LID, UID,X,REALTIME,Season,MyTeamName):
+    def __init__(self, config):
+        
+        LID =config['RTS']['LID']
+        if LID == 'ffff':
+            print('This is the wrong League ID for your league. you need to ', 
+                  'change the contents of your config file')
+            print()
+            raise ConfigError
+        
+        UID = config['RTS']['UID']
+        X = config['RTS']['X']
+        TID = config['RTS']['TID']
+        REALTIME = config['RTS']['REALTIME']
+        Season = config['RTS']['Season']
+        MyTeamName = config['RTS']['MyTeamName']
+        
+        
+        
         self.league_id = LID
         self.year = datetime.datetime.now().year # should change this from calendar year to be within the typical season timeframe
         self.url =  "https://www.rtsports.com/"
@@ -46,7 +72,7 @@ class privateLeague():
         self.cookies =  {'REALTIME':REALTIME}
         self.scoreboard = [None] * 16
         
-        self.slotnames = { 0:'QB', 1:'RB', 2:'WR', 3:'TE', 5:'DEF', 4:'KICKER'}
+        self.slotnames = { 0:'QB', 1:'RB', 2:'WR', 3:'TE', 5:'D/ST', 4:'K'}
         self.slotvalues = {}
         for slotid in self.slotnames:
             self.slotvalues[self.slotnames[slotid]]=slotid
