@@ -21,5 +21,9 @@ print()
 
 for slot in league.slotvalues:
     print("positional Analysis for ", slot)
- 
+    print(league.positionalAnalysis(slot))
+    print()
 league.saveAllData("data.csv")
+transactions = league.getTransactions(1)
+
+
