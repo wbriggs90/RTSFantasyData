@@ -1,6 +1,11 @@
 # RTSFantasyData
 Software to pull league information and use it to make informed roster moves for Realtime Fantasy Sports Leagues
 
+[RT sports website](https://www.rtsports.com/)
+
+
+
+
 
 The following is how to instantiate a league object:
 ```python
@@ -40,7 +45,7 @@ print()
 
 ```
 
-the output is:
+the output showing there are a handful of QBs better than mine (Dak Prescott):
 ```
 positional Analysis for  QB
                       ffl-team  rank_ecr Weekly Projection
