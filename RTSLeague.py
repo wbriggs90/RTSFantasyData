@@ -120,6 +120,45 @@ class privateLeague():
        self.CurrentWeek = currentweek
        return      
     #%% GET RTS DATA
+    def getTransactions(self,Week):
+        '''
+        
+
+        Parameters
+        ----------
+        Week : int
+            What week do you want transactions for?
+
+        Returns
+        -------
+        data : TYPE
+            Dataframe with columns
+            ['Action','Team','Player','Type','Week','Date','Status']
+
+        '''
+  
+        csvparams={'CID':0,'FWK':Week,'CSV':'YES'}
+        csvparams.update(self.parameters)
+
+        data = requests.get(self.url +'football/report-transactions.php',
+                           params=csvparams,
+                           cookies=self.cookies).text
+   
+        print(data)
+        
+        data = pd.read_csv(StringIO(data),skiprows=0,header=None)
+        #print(data)
+        data.columns = ['Action','Team','Player','Type','Week','Date','Status']
+        
+        data = data.set_index('Date')
+        data.index = data.index.str.replace(' II','',regex=True)
+        data.index = data.index.str.replace(' V','',regex=True)
+        data.index = data.index.str.replace(' IV','',regex=True)
+        data.index = data.index.str.replace(' Jr.','',regex=True)
+        data.index = data.index.str.replace('  ',' ',regex=True)
+        return data
+        
+        
    
     def getRosters(self,Week):
         '''
@@ -297,7 +336,7 @@ class privateLeague():
             ecr = data.json()
             positionrankings = pd.DataFrame(ecr['players'])
             rankings = rankings.append(positionrankings)
-        print(rankings.columns)
+        #print(rankings.columns)
         rankings.drop(columns=['player_id',  'sportsdata_id', 
         'player_yahoo_positions', 'player_page_url','player_short_name',
         'player_positions','player_filename', 'player_square_image_url',
