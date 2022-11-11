@@ -73,9 +73,11 @@ for slot in league.slotvalues:
 #save all the data to a .csv file
 league.saveAllData("data.csv")
 
-
-oldweeklypoints,oldtotalpoints,lasttime = pickle.load(open("tran.p","rb"))
-
+try:
+    oldweeklypoints,oldtotalpoints,lasttime = pickle.load(open("tran.p","rb"))
+except:
+    pickle.dump([weeklypoints,totalpoints,time.time()], open("tran.p","wb"))
+    oldweeklypoints,oldtotalpoints,lasttime = pickle.load(open("tran.p","rb"))
 pickle.dump([weeklypoints,totalpoints,time.time()], open("tran.p","wb")) 
 # only email if the totalpoints for the week or season have changed or if a day has passed
 # this could be because of a transaction or ranking change
