@@ -18,7 +18,7 @@ import csv
 import urllib.parse
 from io import StringIO
 
-
+pd.set_option('display.width', 240)
 
 
 class ConfigError(Exception):
@@ -34,9 +34,10 @@ class ConfigError(Exception):
 
 
 class privateLeague():
+    
     '''create an instance of a league for the current year.
     
-    to change year use the setyear function'''
+    to change year use the setyear function '''
     
     
     
@@ -98,6 +99,8 @@ class privateLeague():
         self.Players = pd.merge(self.Players,self.Rankings,how='outer',on='Player')
         self.Players = pd.merge(self.Players,self.getWeeklyECR(),how='outer',on='Player')
         self.Players.sort_values(by='rank_ecr',inplace=True)
+        self.Players['r2p_pts'] = pd.to_numeric(self.Players['r2p_pts'], errors='coerce')
+        self.Players['Weekly Projection'] = pd.to_numeric(self.Players['Weekly Projection'], errors='coerce')
         print()
         print('Getting Rankings')
         
@@ -144,7 +147,7 @@ class privateLeague():
                            params=csvparams,
                            cookies=self.cookies).text
    
-        print(data)
+        #print(data)
         
         data = pd.read_csv(StringIO(data),skiprows=0,header=None)
         #print(data)
@@ -156,6 +159,7 @@ class privateLeague():
         data.index = data.index.str.replace(' IV','',regex=True)
         data.index = data.index.str.replace(' Jr.','',regex=True)
         data.index = data.index.str.replace('  ',' ',regex=True)
+        data.index = data.index.str.replace('.','',regex=True)
         return data
         
         
@@ -195,6 +199,7 @@ class privateLeague():
         data.index = data.index.str.replace(' IV','',regex=True)
         data.index = data.index.str.replace(' Jr.','',regex=True)
         data.index = data.index.str.replace('  ',' ',regex=True)
+        data.index = data.index.str.replace('.','',regex=True)
         return data
     
     def getPlayerData(self):
@@ -226,6 +231,7 @@ class privateLeague():
             data.index = data.index.str.replace(' IV','',regex=True)
             data.index = data.index.str.replace(' Jr.','',regex=True)
             data.index = data.index.str.replace('  ',' ',regex=True)
+            data.index = data.index.str.replace('.','',regex=True)
             players = players.append(data)
             
             
@@ -295,6 +301,9 @@ class privateLeague():
         rankings.index = rankings.index.str.replace(' IV','',regex=True)
         rankings.index = rankings.index.str.replace(' Jr.','',regex=True)
         rankings.index = rankings.index.str.replace('  ',' ',regex=True)
+        rankings.index = rankings.index.str.replace('.','',regex=True)
+        
+        
         return rankings
     
     def getWeeklyECR(self):
@@ -354,6 +363,7 @@ class privateLeague():
         rankings.index = rankings.index.str.replace(' IV','',regex=True)
         rankings.index = rankings.index.str.replace(' Jr.','',regex=True)
         rankings.index = rankings.index.str.replace('  ',' ',regex=True)
+        #rankings.index = rankings.index.str.replace(' .',' ',regex=True)
         rankings = rankings[['Weekly Projection',
                              'Weekly ECR',
                              'start_sit_grade']]
@@ -371,15 +381,81 @@ class privateLeague():
         
         return Best.iloc[0]
     
+
+    
     def positionalAnalysis(self,Pos):
-            
+        """
+        
+
+        Args:
+            Pos (TYPE): The position to analyze.
+
+        Returns:
+            TYPE: DESCRIPTION.
+
+        """
+        weeklypoints = 0
         df = self.Players.loc[(self.Players['Position']==Pos)]
         #print(df)
+        mydf = df.loc[((df['ffl-team']==self.MyTeamName)),
+                    ['ffl-team','rank_ecr','r2p_pts','Weekly Projection','Weekly ECR']]
+        
+        freedf = df.loc[((df['ffl-team'].isnull())),
+                    ['ffl-team','rank_ecr','r2p_pts','Weekly Projection','Weekly ECR']]
+        
+        # First analysis will be to check the weekly projection. 
+        # free agents are sorted from worst to best already
+        # sort my players from worst to best
+        mydf.sort_values(by=['Weekly Projection'], ascending=True,inplace = True)
+        freedf.sort_values(by=['Weekly Projection'], ascending=False,inplace = True)
+        for n in range(len(mydf)):
+            
+            #find the nth best free agent and compare to the nth worst on my team
+            freeagent = freedf.iloc[n]
+            myplayer = mydf.iloc[n]
+            
+            #then compare how many points I might gain this week from this transaction
+            pointdelta = float(freeagent['Weekly Projection'])-float(myplayer['Weekly Projection'])
+            if pointdelta>0:
+                print('Drop ',myplayer.name, ' for ',freeagent.name, ' to gain ',
+                      pointdelta, ' points this week')
+                weeklypoints += pointdelta
+                #if negative then break
+            else:
+                break
+        
+            
+            
+            
+        # Second analysis will be to check the seasonal rank.
+        mydf.sort_values(by=['r2p_pts'], ascending=True,inplace = True)
+        #freedf.sort_values(by=['r2p_pts'], ascending=False,inplace = True)
+        totalpoints = 0
+        for n in range(len(mydf)):
+            
+            #find the nth best free agent and compare to the nth worst on my team
+            freeagent = freedf.iloc[n]
+            myplayer = mydf.iloc[n]
+            
+            #then compare how many points I might gain this week from this transaction
+            pointdelta = float(freeagent['r2p_pts'])-float(myplayer['r2p_pts'])
+            if pointdelta>0:
+                message = ('Drop ',myplayer.name, ' for ',freeagent.name, ' to gain ',
+                      pointdelta, ' points this season')
+                print(message)
+                totalpoints += pointdelta
+                #if negative then break
+            else:
+                break
+        
+        
         df = df.loc[((df['ffl-team'].isnull()) | 
                       (df['ffl-team']==self.MyTeamName)),
-                    ['ffl-team','rank_ecr','Weekly Projection']]
+                    ['ffl-team','rank_ecr','r2p_pts','Weekly Projection','Weekly ECR']]
         
-        return df.head(20)
+        
+        
+        return [df.head(20), totalpoints, weeklypoints]
     
     def getMyWorst(self,Pos):
         df = self.Players.loc[(self.Players['ffl-team']==self.MyTeamName)&(self.Players['Position']==Pos)]
