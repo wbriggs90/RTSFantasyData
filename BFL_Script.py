@@ -12,6 +12,7 @@ import configparser as cp
 import pickle
 import time
 import smtplib, ssl
+import sys,os
 
 
 #%%
@@ -20,13 +21,14 @@ import smtplib, ssl
 port = 465  # For SSL
 
 
-
+scriptdir = os.path.dirname(sys.argv[0])
+configpath = os.path.join(scriptdir, 'config_private.ini')
 
 
 #%%
 #instantiate a configparser and read in some parameters from an existing config file
 config = cp.ConfigParser()
-config.read("config_private.ini")
+config.read(configpath)
 password  = config['RTS']['EmailPW']
 SA = config['RTS']['SA']
 DA = config['RTS']['DA']
