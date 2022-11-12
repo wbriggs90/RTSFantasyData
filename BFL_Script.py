@@ -47,7 +47,7 @@ print()
 
 
 # set up the message subject and header
-message = """\
+mail = """\
 Subject: RTS Transaction Opportunity
    
  
@@ -59,17 +59,20 @@ Info Below
 slotdata = {}
 totalpoints = 0
 weeklypoints = 0
+summary = ''
+datastr = ''
 for slot in league.slotvalues:
     print("positional Analysis for ", slot)
     league.positionalAnalysis(slot)
     print()
-    slotdata[slot],postotalpoints, posweeklypoints = league.positionalAnalysis(slot)
+    slotdata[slot],postotalpoints, posweeklypoints,msg = league.positionalAnalysis(slot)
     totalpoints+=postotalpoints
     weeklypoints += posweeklypoints
     print(slotdata[slot])
-    message = message+str(slot)+ '\n'
-    message = message+str(slotdata[slot])+ '\n \n'
-   
+    summary = summary + msg
+    datastr = datastr+str(slot)+ '\n'
+    datastr = datastr+str(slotdata[slot])+ '\n \n'
+    
 #save all the data to a .csv file
 league.saveAllData("data.csv")
 
@@ -89,7 +92,7 @@ if (oldweeklypoints != weeklypoints or
     print("emailing")
     with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
         server.login(SA, password)
-        server.sendmail(SA,DA,message)
+        server.sendmail(SA,DA,mail+summary+datastr)
 else:
     print('no changes')
 

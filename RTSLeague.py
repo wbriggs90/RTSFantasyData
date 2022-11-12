@@ -18,31 +18,18 @@ import csv
 import urllib.parse
 from io import StringIO
 
-pd.set_option('display.width', 240)
+pd.set_option('display.max_rows', 500)
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.width', 1000)
 
 
 class ConfigError(Exception):
     pass
 
-
-
-
-
-
-
-
-
-
 class privateLeague():
-    
     '''create an instance of a league for the current year.
-    
     to change year use the setyear function '''
-    
-    
-    
-        
-    
+  
     #teams = {}
       
     def __init__(self, config):
@@ -60,8 +47,6 @@ class privateLeague():
         REALTIME = config['RTS']['REALTIME']
         Season = config['RTS']['Season']
         MyTeamName = config['RTS']['MyTeamName']
-        
-        
         
         self.league_id = LID
         self.year = datetime.datetime.now().year # should change this from calendar year to be within the typical season timeframe
@@ -105,7 +90,6 @@ class privateLeague():
         print('Getting Rankings')
         
         
-
     #%% SET VALUES
         
     def setCurrentWeek(self):
@@ -125,8 +109,6 @@ class privateLeague():
     #%% GET RTS DATA
     def getTransactions(self,Week):
         '''
-        
-
         Parameters
         ----------
         Week : int
@@ -137,7 +119,6 @@ class privateLeague():
         data : TYPE
             Dataframe with columns
             ['Action','Team','Player','Type','Week','Date','Status']
-
         '''
   
         csvparams={'CID':0,'FWK':Week,'CSV':'YES'}
@@ -162,12 +143,8 @@ class privateLeague():
         data.index = data.index.str.replace('.','',regex=True)
         return data
         
-        
-   
     def getRosters(self,Week):
         '''
-        
-
         Parameters
         ----------
         Week : TYPE
@@ -205,12 +182,10 @@ class privateLeague():
     def getPlayerData(self):
         '''
         Gets all players including free agents from RTS site
-
         Returns
         -------
         players : TYPE
             DESCRIPTION.
-
         '''
         players = pd.DataFrame()
         for Position in self.slotnames:
@@ -394,6 +369,7 @@ class privateLeague():
             TYPE: DESCRIPTION.
 
         """
+        messages = ''
         weeklypoints = 0
         df = self.Players.loc[(self.Players['Position']==Pos)]
         #print(df)
@@ -404,7 +380,7 @@ class privateLeague():
                     ['ffl-team','rank_ecr','r2p_pts','Weekly Projection','Weekly ECR']]
         
         # First analysis will be to check the weekly projection. 
-        # free agents are sorted from worst to best already
+        
         # sort my players from worst to best
         mydf.sort_values(by=['Weekly Projection'], ascending=True,inplace = True)
         freedf.sort_values(by=['Weekly Projection'], ascending=False,inplace = True)
@@ -416,9 +392,11 @@ class privateLeague():
             
             #then compare how many points I might gain this week from this transaction
             pointdelta = float(freeagent['Weekly Projection'])-float(myplayer['Weekly Projection'])
+        
             if pointdelta>0:
-                print('Drop ',myplayer.name, ' for ',freeagent.name, ' to gain ',
-                      pointdelta, ' points this week')
+                message = 'Drop ' + str(myplayer.name) + ' for ' + str(freeagent.name) + ' to gain ' + str(pointdelta) + ' points this week'
+                messages = messages + message +  '\n'
+                print(message)
                 weeklypoints += pointdelta
                 #if negative then break
             else:
@@ -429,7 +407,7 @@ class privateLeague():
             
         # Second analysis will be to check the seasonal rank.
         mydf.sort_values(by=['r2p_pts'], ascending=True,inplace = True)
-        #freedf.sort_values(by=['r2p_pts'], ascending=False,inplace = True)
+        freedf.sort_values(by=['r2p_pts'], ascending=False,inplace = True)
         totalpoints = 0
         for n in range(len(mydf)):
             
@@ -440,8 +418,8 @@ class privateLeague():
             #then compare how many points I might gain this week from this transaction
             pointdelta = float(freeagent['r2p_pts'])-float(myplayer['r2p_pts'])
             if pointdelta>0:
-                message = ('Drop ',myplayer.name, ' for ',freeagent.name, ' to gain ',
-                      pointdelta, ' points this season')
+                message = 'Drop ' + str(myplayer.name) + ' for ' + str(freeagent.name) + ' to gain ' + str(pointdelta) + ' points this season'
+                messages = messages + message + '\n'
                 print(message)
                 totalpoints += pointdelta
                 #if negative then break
@@ -455,7 +433,7 @@ class privateLeague():
         
         
         
-        return [df.head(20), totalpoints, weeklypoints]
+        return [df.head(20), totalpoints, weeklypoints,messages]
     
     def getMyWorst(self,Pos):
         df = self.Players.loc[(self.Players['ffl-team']==self.MyTeamName)&(self.Players['Position']==Pos)]
