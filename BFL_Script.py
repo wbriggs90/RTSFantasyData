@@ -65,7 +65,7 @@ summary = ''
 datastr = ''
 for slot in league.slotvalues:
     print("positional Analysis for ", slot)
-    league.positionalAnalysis(slot)
+    
     print()
     slotdata[slot],postotalpoints, posweeklypoints,msg = league.positionalAnalysis(slot)
     totalpoints+=postotalpoints
