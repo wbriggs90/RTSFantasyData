@@ -75,17 +75,26 @@ class privateLeague():
         print()
         print('Getting Rosters')
         self.Rosters = self.getRosters(self.CurrentWeek)
-        self.Rankings = self.getROSECR()
+        print(self.Rosters)
+        if self.CurrentWeek==0:
+            self.Rankings = self.getDraftECR()
+        else:
+            self.Rankings = self.getROSECR()
         self.MyRoster = self.Rosters[self.Rosters['ffl-team']==self.MyTeamName]
         print()
         print('Getting Player Data')
         self.Players = self.getPlayerData()
+        
         self.Players = pd.merge(self.Players,self.Rosters,how='outer',on='Player')
         self.Players = pd.merge(self.Players,self.Rankings,how='outer',on='Player')
-        self.Players = pd.merge(self.Players,self.getWeeklyECR(),how='outer',on='Player')
-        self.Players.sort_values(by='rank_ecr',inplace=True)
-        self.Players['r2p_pts'] = pd.to_numeric(self.Players['r2p_pts'], errors='coerce')
-        self.Players['Weekly Projection'] = pd.to_numeric(self.Players['Weekly Projection'], errors='coerce')
+        if self.CurrentWeek==0:
+            self.Players.sort_values(by='rank_ecr',inplace=True)
+            
+        else:
+            self.Players = pd.merge(self.Players,self.getWeeklyECR(),how='outer',on='Player')
+            self.Players.sort_values(by='rank_ecr',inplace=True)
+            self.Players['r2p_pts'] = pd.to_numeric(self.Players['r2p_pts'], errors='coerce')
+            self.Players['Weekly Projection'] = pd.to_numeric(self.Players['Weekly Projection'], errors='coerce')
         print()
         print('Getting Rankings')
         
@@ -103,7 +112,11 @@ class privateLeague():
        
        week = soup.find(class_='header-notes hidden-tn')
        print(week.string)
-       currentweek = int(week.string[10:12])
+       if week.string[5:14]=='Preseason':
+           print('setting week as week 0...')
+           currentweek = 0
+       else:
+           currentweek = int(week.string[10:12])
        self.CurrentWeek = currentweek
        return      
     #%% GET RTS DATA
@@ -120,7 +133,7 @@ class privateLeague():
             Dataframe with columns
             ['Action','Team','Player','Type','Week','Date','Status']
         '''
-  
+
         csvparams={'CID':0,'FWK':Week,'CSV':'YES'}
         csvparams.update(self.parameters)
 
@@ -163,11 +176,13 @@ class privateLeague():
         data = requests.get(self.url +'football/report-rosters.php',
                            params=csvparams,
                            cookies=self.cookies).text
-   
-        
+        if len(data) == 0:
+            print('no rosters yet')
+            return
+        print('retrieved roster data')
         
         data = pd.read_csv(StringIO(data),skiprows=0,header=None)
-        #print(data)
+        
         data.columns = ['ffl-team','Player','Position','nfl-team','Roster Status','']
         data.drop(columns=['','Position','nfl-team'], inplace=True)
         data = data.set_index('Player')
@@ -219,6 +234,68 @@ class privateLeague():
     #%% FREE AGENT STUFF
    
     #%%  RANKINGS
+    def getDraftECR(self):
+        '''
+        valid position codes:
+            "QB, RB, WR, TE, K, OP, FLX, DST, IDP, DL, LB, DB, TK, TQB, TRB, TWR, TTE, TOL, HC, P"}
+        
+        Valid type codes:
+                ST, weekly, Draft Half PPR, ROS
+                ROS will give rest of season rankings
+                weekly will give just this week
+                I am not sure what the type is for?
+                
+        id: 1054
+        
+        Unused params
+        'filters':'1:2:3:4:5:7:8:9:285:699',
+            not sure what the filters mean
+    Returns
+        -------
+        ecr : TYPE
+            DESCRIPTION.
+    
+        '''
+    
+        rankings = pd.DataFrame()
+        positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
+        
+        for position in positions:
+            print('getting draft rankings for ', position)
+            params = {'sport':'NFL','year':self.year,'week':0,
+                      'position':position,'id':1054,"ranking_type_name":"ros",'scoring':'PPR',
+                      'export':'json'}
+            
+            url ='https://partners.fantasypros.com/api/v1/consensus-rankings.php' #?sport=NFL&year=2020&week=0&id=1054&position=ALL&type=ST&scoring=HALF&filters=1:2:3:4:5:7:8:9:285:699&export=json'
+            
+                
+            data = requests.get(url,params=params)
+            
+            ecr = data.json()
+            
+            positionrankings = pd.DataFrame(ecr['players'])
+            
+            rankings = rankings.append(positionrankings)
+        
+        rankings.drop(columns=['player_id',  'sportsdata_id', 
+        'player_yahoo_positions', 'player_page_url','player_short_name',
+        'player_positions','player_filename', 'player_square_image_url',
+        'player_image_url','player_yahoo_id', 'cbs_player_id',
+        'player_bye_week','player_owned_yahoo','player_owned_espn',
+        'player_position_id','player_eligibility','player_eligibility'], inplace=True )
+        
+        rankings.rename(columns={'player_name':'Player'},inplace=True)
+        rankings = rankings.set_index('Player')
+        #Sanitize some data
+        rankings.index = rankings.index.str.replace(' II','',regex=True)
+        rankings.index = rankings.index.str.replace(' V','',regex=True)
+        rankings.index = rankings.index.str.replace(' IV','',regex=True)
+        rankings.index = rankings.index.str.replace(' Jr.','',regex=True)
+        rankings.index = rankings.index.str.replace('  ',' ',regex=True)
+        rankings.index = rankings.index.str.replace('.','',regex=True)
+        
+        
+        return rankings
 
     
     def getROSECR(self):
@@ -248,6 +325,7 @@ class privateLeague():
         positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
         
         for position in positions:
+            print('getting ROS rankings for ', position)
             params = {'sport':'NFL','year':self.year,'week':0,
                       'position':position,'id':1054,'type':'ROS',"ranking_type_name":"ros",'scoring':'PPR',
                       'export':'json'}
@@ -258,7 +336,9 @@ class privateLeague():
             data = requests.get(url,params=params)
             
             ecr = data.json()
+            
             positionrankings = pd.DataFrame(ecr['players'])
+            print(positionrankings)
             rankings = rankings.append(positionrankings)
         
         rankings.drop(columns=['player_id',  'sportsdata_id', 
@@ -325,7 +405,7 @@ class privateLeague():
         'player_yahoo_positions', 'player_page_url','player_short_name',
         'player_positions','player_filename', 'player_square_image_url',
         'player_image_url','player_yahoo_id', 'cbs_player_id',
-        'player_bye_week','note','player_owned_yahoo','player_owned_espn',
+        'player_bye_week','player_owned_yahoo','player_owned_espn',
         'player_position_id','player_eligibility','player_eligibility'], inplace=True )
         
         rankings.rename(columns={'player_name':'Player',
