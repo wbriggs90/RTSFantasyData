@@ -26,17 +26,12 @@ config = cp.ConfigParser()
 config.read(configpath)
 
 
-
 #instantiate a league
 league = rt.privateLeague(config)
 print()
 
 
-
-
 #save the current values for next time
-
-
 
 
 #iterate through the positions

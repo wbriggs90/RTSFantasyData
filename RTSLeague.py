@@ -17,6 +17,9 @@ import pandas as pd
 import csv
 import urllib.parse
 from io import StringIO
+import time
+import os
+import json
 
 pd.set_option('display.max_rows', 500)
 pd.set_option('display.max_columns', 500)
@@ -47,7 +50,8 @@ class privateLeague():
         REALTIME = config['RTS']['REALTIME']
         Season = config['RTS']['Season']
         MyTeamName = config['RTS']['MyTeamName']
-        
+        FPKey = config['RTS']['FPKey']
+        directory = 'cached-rankings-data'
         self.league_id = LID
         self.year = datetime.datetime.now().year # should change this from calendar year to be within the typical season timeframe
         self.url =  "https://www.rtsports.com/"
@@ -55,6 +59,7 @@ class privateLeague():
         self.parameters = {'LID': LID,
                            'UID': UID,
                            'X':X}
+        self.FPKey = FPKey
         self.cookies =  {'REALTIME':REALTIME}
         self.scoreboard = [None] * 16
         
@@ -76,10 +81,7 @@ class privateLeague():
         print('Getting Rosters')
         self.Rosters = self.getRosters(self.CurrentWeek)
         print(self.Rosters)
-        if self.CurrentWeek==0:
-            self.Rankings = self.getDraftECR()
-        else:
-            self.Rankings = self.getROSECR()
+        self.Rankings = self.getROSECR(directory)
         self.MyRoster = self.Rosters[self.Rosters['ffl-team']==self.MyTeamName]
         print()
         print('Getting Player Data')
@@ -87,14 +89,10 @@ class privateLeague():
         
         self.Players = pd.merge(self.Players,self.Rosters,how='outer',on='Player')
         self.Players = pd.merge(self.Players,self.Rankings,how='outer',on='Player')
-        if self.CurrentWeek==0:
-            self.Players.sort_values(by='rank_ecr',inplace=True)
-            
-        else:
-            self.Players = pd.merge(self.Players,self.getWeeklyECR(),how='outer',on='Player')
-            self.Players.sort_values(by='rank_ecr',inplace=True)
-            self.Players['r2p_pts'] = pd.to_numeric(self.Players['r2p_pts'], errors='coerce')
-            self.Players['Weekly Projection'] = pd.to_numeric(self.Players['Weekly Projection'], errors='coerce')
+        self.Players = pd.merge(self.Players,self.getWeeklyECR(directory),how='outer',on='Player')
+        self.Players.sort_values(by='rank_ecr',inplace=True)
+        self.Players['r2p_pts'] = pd.to_numeric(self.Players['r2p_pts'], errors='coerce')
+        self.Players['Weekly Projection'] = pd.to_numeric(self.Players['Weekly Projection'], errors='coerce')
         print()
         print('Getting Rankings')
         
@@ -234,6 +232,8 @@ class privateLeague():
     #%% FREE AGENT STUFF
    
     #%%  RANKINGS
+
+        
     def getDraftECR(self):
         '''
         valid position codes:
@@ -249,7 +249,7 @@ class privateLeague():
         
         Unused params
         'filters':'1:2:3:4:5:7:8:9:285:699',
-            not sure what the filters mean
+           filters are a whitelist of 
     Returns
         -------
         ecr : TYPE
@@ -297,59 +297,80 @@ class privateLeague():
         
         return rankings
 
+    def getROSECR(self,directory):
+        print('*************Getting ROS Rankings*************')
+        headers = {'x-api-key': self.FPKey}
     
-    def getROSECR(self):
-        '''
-        valid position codes:
-            "QB, RB, WR, TE, K, OP, FLX, DST, IDP, DL, LB, DB, TK, TQB, TRB, TWR, TTE, TOL, HC, P"}
-        
-        Valid type codes:
-                ST, weekly, Draft Half PPR, ROS
-                ROS will give rest of season rankings
-                weekly will give just this week
-                I am not sure what the type is for?
-                
-        id: 1054
-        
-        Unused params
-        'filters':'1:2:3:4:5:7:8:9:285:699',
-            not sure what the filters mean
-    Returns
-        -------
-        ecr : TYPE
-            DESCRIPTION.
-
-        '''
-        
+        #  'valid_format': 'QB, RB, WR, TE, K, OP, FLX, DST, IDP, DL, LB, DB, TK, TQB, TRB, TWR, TTE, TOL, HC, P'}
+        positions = ['QB','RB','WR','TE','K','DST']
+        datadict = {}
         rankings = pd.DataFrame()
-        positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
-        
+            
         for position in positions:
-            print('getting ROS rankings for ', position)
-            params = {'sport':'NFL','year':self.year,'week':0,
-                      'position':position,'id':1054,'type':'ROS',"ranking_type_name":"ros",'scoring':'PPR',
-                      'export':'json'}
+            print('Loading data for ',position)
+            filename = os.path.join(directory, position+'-ROS.txt')
+            time_difference = datetime.timedelta(minutes=0)
+            nofile=0
+            try:
+                with open(filename, 'r') as json_file:
+                    data = json.load(json_file)
+                    timestamp_str = data.get("timestamp", "")
+                    timestamp = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                    # Calculate the current time
+                    current_time = datetime.datetime.now()
+        
+                    # Calculate the time difference
+                    time_difference = current_time - timestamp
+                    
+            except FileNotFoundError:
+                print(f"File '{filename}' not found.")
+                nofile = 1    
+        
             
-            url ='https://partners.fantasypros.com/api/v1/consensus-rankings.php' #?sport=NFL&year=2020&week=0&id=1054&position=ALL&type=ST&scoring=HALF&filters=1:2:3:4:5:7:8:9:285:699&export=json'
-            
+                # Check if the timestamp is older than 30 minutes
+            if (time_difference > datetime.timedelta(minutes=30) or nofile):
+                print("The data is older than 30 minutes or the file doesn't exist")
+                params = {'position': position,'scoring':'PPR'}
+                url ='https://api.fantasypros.com/public/v2/json/nfl/2023/projections'
                 
-            data = requests.get(url,params=params)
+                print('getting Fantasy Pros data for ',position)
+                time.sleep(1)  # not supposed to poll the api faster than 1 second
+                response = requests.get(url,headers=headers,params=params)
+                
+                data = response.json()
+                data["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                print('saving json data')
+                with open(filename, "w") as fp:
+                    json.dump(data, fp)
+                    
+                    
+            else:
+                print("The data is NOT older than 30 minutes.")
+                print("using Loaded data")
             
-            ecr = data.json()
+            playerdata = data['players']
             
-            positionrankings = pd.DataFrame(ecr['players'])
-            print(positionrankings)
-            rankings = rankings.append(positionrankings)
+            filename = os.path.join(directory, position+'-ROS.csv')
+            datadict[position]=playerdata
+            
+            print('saving player data to csv')
+            df = pd.DataFrame(playerdata)
+            df.set_index('name')
+            df[['r2p_pts']] = df[['stats']].applymap(lambda x: x['points'])
+            df.sort_values(by='r2p_pts',inplace=True,ascending=False)
+            df['rank_ecr'] = range(1, len(df) + 1)
+            df.to_csv(filename)
         
-        rankings.drop(columns=['player_id',  'sportsdata_id', 
-        'player_yahoo_positions', 'player_page_url','player_short_name',
-        'player_positions','player_filename', 'player_square_image_url',
-        'player_image_url','player_yahoo_id', 'cbs_player_id',
-        'player_bye_week','note','player_owned_yahoo','player_owned_espn',
-        'player_position_id','player_eligibility','player_eligibility'], inplace=True )
+            
+            #append this data to the output
+            rankings = pd.concat([df,rankings])
+            print()
+        rankings.drop(columns=['fpid', 'mflid', 'filename'], inplace=True )
         
-        rankings.rename(columns={'player_name':'Player'},inplace=True)
+        rankings.rename(columns={'name':'Player'},inplace=True)
         rankings = rankings.set_index('Player')
+        
         #Sanitize some data
         rankings.index = rankings.index.str.replace(' II','',regex=True)
         rankings.index = rankings.index.str.replace(' V','',regex=True)
@@ -358,56 +379,86 @@ class privateLeague():
         rankings.index = rankings.index.str.replace('  ',' ',regex=True)
         rankings.index = rankings.index.str.replace('.','',regex=True)
         
+        rankings.to_csv(os.path.join(directory,'ROS-rankings.csv') )
         
         return rankings
-    
-    def getWeeklyECR(self):
-        '''
-        valid position codes:
-            "QB, RB, WR, TE, K, OP, FLX, DST, IDP, DL, LB, DB, TK, TQB, TRB, TWR, TTE, TOL, HC, P"}
-        
-        Valid type codes:
-                ST, weekly, Draft Half PPR, ROS
-                ROS will give rest of season rankings
-                weekly will give just this week
-                I am not sure what the type is for?
-                
-        id: 1054
-        
-        Unused params
-        'filters':'1:2:3:4:5:7:8:9:285:699',
-            not sure what the filters mean
-    Returns
-        -------
-        ecr : TYPE
-            DESCRIPTION.
 
-        '''
-        
+    
+    def getWeeklyECR(self,directory):
+        print('*************Getting Weekly Rankings*************')
+        headers = {'x-api-key': self.FPKey}
+
+        #  'valid_format': 'QB, RB, WR, TE, K, OP, FLX, DST, IDP, DL, LB, DB, TK, TQB, TRB, TWR, TTE, TOL, HC, P'}
+        positions = ['qb','rb','wr','te','k','dst']
+        datadict = {}
         rankings = pd.DataFrame()
-        positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DST']
-        
+            
         for position in positions:
-            params = {'sport':'NFL','year':self.year,'week':self.CurrentWeek,
-                      'position':position,'id':1054,'type':'weekly',"ranking_type_name":"ros",'scoring':'PPR',
-                      'export':'json'}
-            
-            url ='https://partners.fantasypros.com/api/v1/consensus-rankings.php' #?sport=NFL&year=2020&week=0&id=1054&position=ALL&type=ST&scoring=HALF&filters=1:2:3:4:5:7:8:9:285:699&export=json'
-            
-                
-            data = requests.get(url,params=params)
-            
-            ecr = data.json()
-            positionrankings = pd.DataFrame(ecr['players'])
-            rankings = rankings.append(positionrankings)
-        #print(rankings.columns)
-        rankings.drop(columns=['player_id',  'sportsdata_id', 
-        'player_yahoo_positions', 'player_page_url','player_short_name',
-        'player_positions','player_filename', 'player_square_image_url',
-        'player_image_url','player_yahoo_id', 'cbs_player_id',
-        'player_bye_week','player_owned_yahoo','player_owned_espn',
-        'player_position_id','player_eligibility','player_eligibility'], inplace=True )
+            print('Loading data for ',position)
+            filename = os.path.join(directory, position+'-weekly.txt')
+            time_difference = datetime.timedelta(minutes=0)
+            nofile=0
+            try:
+                with open(filename, 'r') as json_file:
+                    data = json.load(json_file)
+                    timestamp_str = data.get("timestamp", "")
+                    timestamp = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                    # Calculate the current time
+                    current_time = datetime.datetime.now()
         
+                    # Calculate the time difference
+                    time_difference = current_time - timestamp
+                    
+            except FileNotFoundError:
+                print(f"File '{filename}' not found.")
+                nofile = 1    
+        
+                 
+                 
+        
+            
+            
+                # Check if the timestamp is older than 30 minutes
+            if (time_difference > datetime.timedelta(minutes=30) or nofile):
+                print("The data is older than 30 minutes or the file doesn't exist")
+                #params = {'position': position,'scoring':'PPR','type':'Weekly','week':1} 
+                params = {'position': position,'scoring':'PPR','week':1}
+                url ='https://api.fantasypros.com/public/v2/json/nfl/2023/consensus-rankings'
+                
+                print('getting Fantasy Pros data for ',position)
+                time.sleep(1)  # not supposed to poll the api faster than 1 second
+                response = requests.get(url,headers=headers,params=params)
+                
+                data = response.json()
+                data["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                print('saving json data')
+                with open(filename, "w") as fp:
+                    json.dump(data, fp)
+                    
+                    
+            else:
+                print("The data is NOT older than 30 minutes.")
+                print("using Loaded data")
+            
+            playerdata = data['players']
+            
+            filename = os.path.join(directory, position+'-weekly.csv')
+            datadict[position]=playerdata
+            
+            print('saving player data to csv')
+            df = pd.DataFrame(playerdata)
+            df.set_index('player_name')
+            df.to_csv(filename)
+        
+            
+            #append this data to the output
+            rankings = pd.concat([df,rankings])
+            print()
+            
+            
+        #return the rankings dataframe
+        rankings.to_csv(os.path.join(directory,'weekly-rankings.csv') )
         rankings.rename(columns={'player_name':'Player',
                                  'r2p_pts':'Weekly Projection',
                                  'rank_ecr':'Weekly ECR'},inplace=True)
@@ -421,10 +472,9 @@ class privateLeague():
         #rankings.index = rankings.index.str.replace(' .',' ',regex=True)
         rankings = rankings[['Weekly Projection',
                              'Weekly ECR',
-                             'start_sit_grade']]
-
-        
+                             'start_sit_grade',]]
         return rankings
+
         
     #%%  SCRIPTS
         
