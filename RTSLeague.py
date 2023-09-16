@@ -3,7 +3,7 @@
 Created on Mon Sep  7 22:19:04 2020
 
 @author: Briggs
-some usefule links:
+some useful links:
 Average draft position (ADP) - 'https://fantasyfootballcalculator.com/api/v1/adp/standard?teams=8&year=2019'
 Expert consensus Rankings - 'https://partners.fantasypros.com/api/v1/consensus-rankings.php?sport=NFL&year=2019&week=0&id=1054&position=ALL&type=ST&scoring=HALF&filters=1:2:3:4:5:7:8:9:285:699&export=json'
 
@@ -472,7 +472,10 @@ class privateLeague():
         #rankings.index = rankings.index.str.replace(' .',' ',regex=True)
         rankings = rankings[['Weekly Projection',
                              'Weekly ECR',
-                             'start_sit_grade',]]
+                             'start_sit_grade',
+                             'rank_min',
+                             'rank_max',
+                             'rank_ave']]
         return rankings
 
         

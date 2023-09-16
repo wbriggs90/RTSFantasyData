@@ -9,9 +9,6 @@ Created on Wed Sep  9 20:59:33 2020
 
 import RTSLeague as rt
 import configparser as cp
-import pickle
-import time
-import smtplib, ssl
 import sys,os
 
 
