@@ -86,15 +86,18 @@ class privateLeague():
         print()
         print('Getting Player Data')
         self.Players = self.getPlayerData()
-        
+        print()
+        print('Getting Rankings')
         self.Players = pd.merge(self.Players,self.Rosters,how='outer',on='Player')
         self.Players = pd.merge(self.Players,self.Rankings,how='outer',on='Player')
         self.Players = pd.merge(self.Players,self.getWeeklyECR(directory),how='outer',on='Player')
-        self.Players.sort_values(by='rank_ecr',inplace=True)
-        self.Players['r2p_pts'] = pd.to_numeric(self.Players['r2p_pts'], errors='coerce')
+        self.Players.sort_values(by='ros_rank_ecr',inplace=True)
+        self.Players['ros_projection'] = pd.to_numeric(self.Players['ros_projection'], errors='coerce')
         self.Players['Weekly Projection'] = pd.to_numeric(self.Players['Weekly Projection'], errors='coerce')
-        print()
-        print('Getting Rankings')
+        #if any of the weekly rankings are NaN then replace them with the ROS ranking
+        self.Players['weekly_rank_min'].fillna(self.Players['ros_rank_ecr'], inplace=True)
+        self.Players['weekly_rank_max'].fillna(self.Players['ros_rank_ecr'], inplace=True)
+        self.Players['Weekly ECR'].fillna(self.Players['ros_rank_ecr'], inplace=True)
         
         
     #%% SET VALUES
@@ -357,9 +360,9 @@ class privateLeague():
             print('saving player data to csv')
             df = pd.DataFrame(playerdata)
             df.set_index('name')
-            df[['r2p_pts']] = df[['stats']].applymap(lambda x: x['points'])
-            df.sort_values(by='r2p_pts',inplace=True,ascending=False)
-            df['rank_ecr'] = range(1, len(df) + 1)
+            df[['ros_projection']] = df[['stats']].applymap(lambda x: x['points'])
+            df.sort_values(by='ros_projection',inplace=True,ascending=False)
+            df['ros_rank_ecr'] = range(1, len(df) + 1)
             df.to_csv(filename)
         
             
@@ -370,6 +373,7 @@ class privateLeague():
         
         rankings.rename(columns={'name':'Player'},inplace=True)
         rankings = rankings.set_index('Player')
+        
         
         #Sanitize some data
         rankings.index = rankings.index.str.replace(' II','',regex=True)
@@ -461,9 +465,17 @@ class privateLeague():
         rankings.to_csv(os.path.join(directory,'weekly-rankings.csv') )
         rankings.rename(columns={'player_name':'Player',
                                  'r2p_pts':'Weekly Projection',
-                                 'rank_ecr':'Weekly ECR'},inplace=True)
+                                 'rank_ecr':'Weekly ECR',
+                                 'rank_min':'weekly_rank_min',
+                                 'rank_max':'weekly_rank_max'},inplace=True)
         
         rankings = rankings.set_index('Player')
+        
+        rankings['weekly_rank_max'] = pd.to_numeric(rankings['weekly_rank_max'], errors='coerce')
+        rankings['weekly_rank_min'] = pd.to_numeric(rankings['weekly_rank_min'], errors='coerce')
+        rankings['Weekly ECR'] = pd.to_numeric(rankings['Weekly ECR'], errors='coerce')
+        
+        
         rankings.index = rankings.index.str.replace(' II','',regex=True)
         rankings.index = rankings.index.str.replace(' V','',regex=True)
         rankings.index = rankings.index.str.replace(' IV','',regex=True)
@@ -473,9 +485,8 @@ class privateLeague():
         rankings = rankings[['Weekly Projection',
                              'Weekly ECR',
                              'start_sit_grade',
-                             'rank_min',
-                             'rank_max',
-                             'rank_ave']]
+                             'weekly_rank_min',
+                             'weekly_rank_max',]]
         return rankings
 
         
@@ -507,10 +518,10 @@ class privateLeague():
         df = self.Players.loc[(self.Players['Position']==Pos)]
         #print(df)
         mydf = df.loc[((df['ffl-team']==self.MyTeamName)),
-                    ['ffl-team','rank_ecr','r2p_pts','Weekly Projection','Weekly ECR']]
+                    ['ffl-team','ros_rank_ecr','ros_projection','Weekly Projection','Weekly ECR']]
         
         freedf = df.loc[((df['ffl-team'].isnull())),
-                    ['ffl-team','rank_ecr','r2p_pts','Weekly Projection','Weekly ECR']]
+                    ['ffl-team','ros_rank_ecr','ros_projection','Weekly Projection','Weekly ECR']]
         
         # First analysis will be to check the weekly projection. 
         
@@ -539,8 +550,8 @@ class privateLeague():
             
             
         # Second analysis will be to check the seasonal rank.
-        mydf.sort_values(by=['r2p_pts'], ascending=True,inplace = True)
-        freedf.sort_values(by=['r2p_pts'], ascending=False,inplace = True)
+        mydf.sort_values(by=['ros_projection'], ascending=True,inplace = True)
+        freedf.sort_values(by=['ros_projection'], ascending=False,inplace = True)
         totalpoints = 0
         for n in range(len(mydf)):
             
@@ -549,7 +560,7 @@ class privateLeague():
             myplayer = mydf.iloc[n]
             
             #then compare how many points I might gain this week from this transaction
-            pointdelta = float(freeagent['r2p_pts'])-float(myplayer['r2p_pts'])
+            pointdelta = float(freeagent['ros_projection'])-float(myplayer['ros_projection'])
             if pointdelta>0:
                 message = 'Drop ' + str(myplayer.name) + ' for ' + str(freeagent.name) + ' to gain ' + str(pointdelta) + ' points this season'
                 messages = messages + message + '\n'
@@ -562,7 +573,8 @@ class privateLeague():
         
         df = df.loc[((df['ffl-team'].isnull()) | 
                       (df['ffl-team']==self.MyTeamName)),
-                    ['ffl-team','rank_ecr','r2p_pts','Weekly Projection','Weekly ECR']]
+                    ['ffl-team','ros_rank_ecr','ros_projection',
+                     'Weekly Projection','Weekly ECR', 'weekly_rank_min', 'weekly_rank_max']]
         
         
         
