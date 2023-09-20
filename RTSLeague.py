@@ -31,7 +31,7 @@ class ConfigError(Exception):
 
 class privateLeague():
     '''create an instance of a league for the current year.
-    to change year use the setyear function '''
+    to change year use the setyear() function '''
   
     #teams = {}
       
