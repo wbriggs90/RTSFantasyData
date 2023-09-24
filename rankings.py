@@ -85,95 +85,8 @@ Returns
     
     return rankings
 
-def getROSECR(FPKey,directory):
-    print('*************Getting ROS Rankings*************')
-    headers = {'x-api-key': FPKey}
 
-    #  'valid_format': 'QB, RB, WR, TE, K, OP, FLX, DST, IDP, DL, LB, DB, TK, TQB, TRB, TWR, TTE, TOL, HC, P'}
-    positions = ['QB','RB','WR','TE','K','DST']
-    datadict = {}
-    rankings = pd.DataFrame()
-        
-    for position in positions:
-        print('Loading data for ',position)
-        filename = os.path.join(directory, position+'-ROS.txt')
-        time_difference = datetime.timedelta(minutes=0)
-        nofile=0
-        try:
-            with open(filename, 'r') as json_file:
-                data = json.load(json_file)
-                timestamp_str = data.get("timestamp", "")
-                timestamp = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-                # Calculate the current time
-                current_time = datetime.datetime.now()
-    
-                # Calculate the time difference
-                time_difference = current_time - timestamp
-                
-        except FileNotFoundError:
-            print(f"File '{filename}' not found.")
-            nofile = 1    
-    
-        
-            # Check if the timestamp is older than 30 minutes
-        if (time_difference > datetime.timedelta(minutes=30) or nofile):
-            print("The data is older than 30 minutes or the file doesn't exist")
-            params = {'position': position,'scoring':'PPR'}
-            url ='https://api.fantasypros.com/public/v2/json/nfl/2023/projections'
-            
-            print('getting Fantasy Pros data for ',position)
-            time.sleep(1)  # not supposed to poll the api faster than 1 second
-            response = requests.get(url,headers=headers,params=params)
-            
-            data = response.json()
-            data["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
-            print('saving json data')
-            with open(filename, "w") as fp:
-                json.dump(data, fp)
-                
-                
-        else:
-            print("The data is NOT older than 30 minutes.")
-            print("using Loaded data")
-        
-        playerdata = data['players']
-        
-        filename = os.path.join(directory, position+'-ROS.csv')
-        datadict[position]=playerdata
-        
-        print('saving player data to csv')
-        df = pd.DataFrame(playerdata)
-        df.set_index('name')
-        df[['ros_projection']] = df[['stats']].applymap(lambda x: x['points'])
-        df.sort_values(by='ros_projection',inplace=True,ascending=False)
-        df['ros_rank_ecr'] = range(1, len(df) + 1)
-        df.to_csv(filename)
-    
-        
-        #append this data to the output
-        rankings = pd.concat([df,rankings])
-        print()
-    rankings.drop(columns=['fpid', 'mflid', 'filename'], inplace=True )
-    
-    rankings.rename(columns={'name':'Player'},inplace=True)
-    rankings = rankings.set_index('Player')
-    
-    
-    #Sanitize some data
-    rankings.index = rankings.index.str.replace(' II','',regex=True)
-    rankings.index = rankings.index.str.replace(' V','',regex=True)
-    rankings.index = rankings.index.str.replace(' IV','',regex=True)
-    rankings.index = rankings.index.str.replace(' Jr.','',regex=True)
-    rankings.index = rankings.index.str.replace('  ',' ',regex=True)
-    rankings.index = rankings.index.str.replace('.','',regex=True)
-    
-    rankings.to_csv(os.path.join(directory,'ROS-rankings.csv') )
-    
-    return rankings
-
-
-def getWeeklyECR(FPKey,directory):
+def getWeeklyECR(FPKey,directory,week):
     print('*************Getting Weekly Rankings*************')
     headers = {'x-api-key': FPKey}
 
@@ -201,17 +114,13 @@ def getWeeklyECR(FPKey,directory):
         except FileNotFoundError:
             print(f"File '{filename}' not found.")
             nofile = 1    
-    
-             
-             
-    
-        
+
         
             # Check if the timestamp is older than 30 minutes
         if (time_difference > datetime.timedelta(minutes=30) or nofile):
             print("The data is older than 30 minutes or the file doesn't exist")
             #params = {'position': position,'scoring':'PPR','type':'Weekly','week':1} 
-            params = {'position': position,'scoring':'PPR','week':1}
+            params = {'position': position,'scoring':'PPR','week':week}
             url ='https://api.fantasypros.com/public/v2/json/nfl/2023/consensus-rankings'
             
             print('getting Fantasy Pros data for ',position)
@@ -269,9 +178,102 @@ def getWeeklyECR(FPKey,directory):
     #rankings.index = rankings.index.str.replace(' .',' ',regex=True)
     rankings = rankings[['Weekly Projection',
                          'Weekly ECR',
-                         'start_sit_grade',
                          'weekly_rank_min',
                          'weekly_rank_max',]]
     return rankings
 
+def getROSECR(FPKey,directory):
+    print('*************Getting ROS Rankings*************')
+    headers = {'x-api-key': FPKey}
+
+    #  'valid_format': 'QB, RB, WR, TE, K, OP, FLX, DST, IDP, DL, LB, DB, TK, TQB, TRB, TWR, TTE, TOL, HC, P'}
+    positions = ['qb','rb','wr','te','k','dst']
+    datadict = {}
+    rankings = pd.DataFrame()
+        
+    for position in positions:
+        print('Loading data for ',position)
+        filename = os.path.join(directory, position+'-ROS.txt')
+        time_difference = datetime.timedelta(minutes=0)
+        nofile=0
+        try:
+            with open(filename, 'r') as json_file:
+                data = json.load(json_file)
+                timestamp_str = data.get("timestamp", "")
+                timestamp = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                # Calculate the current time
+                current_time = datetime.datetime.now()
+    
+                # Calculate the time difference
+                time_difference = current_time - timestamp
+                
+        except FileNotFoundError:
+            print(f"File '{filename}' not found.")
+            nofile = 1    
+
+        
+            # Check if the timestamp is older than 30 minutes
+        if (time_difference > datetime.timedelta(minutes=30) or nofile):
+            print("The data is older than 30 minutes or the file doesn't exist") 
+            params = {'position': position,'scoring':'PPR','week':0,'type':'ROS'}
+            url ='https://api.fantasypros.com/public/v2/json/nfl/2023/consensus-rankings'
+            
+            print('getting Fantasy Pros data for ',position)
+            time.sleep(1)  # not supposed to poll the api faster than 1 second
+            response = requests.get(url,headers=headers,params=params)
+            
+            data = response.json()
+            data["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            print('saving json data')
+            with open(filename, "w") as fp:
+                json.dump(data, fp)
+                
+                
+        else:
+            print("The data is NOT older than 30 minutes.")
+            print("using Loaded data")
+        
+        playerdata = data['players']
+        
+        filename = os.path.join(directory, position+'-ROS.csv')
+        datadict[position]=playerdata
+        
+        print('saving player data to csv')
+        df = pd.DataFrame(playerdata)
+        df.set_index('player_name')
+        df.to_csv(filename)
+    
+        
+        #append this data to the output
+        rankings = pd.concat([df,rankings])
+        print()
+        
+        
+    #return the rankings dataframe
+    rankings.to_csv(os.path.join(directory,'ROS-rankings.csv') )
+    rankings.rename(columns={'player_name':'Player',
+                             'r2p_pts':'ros_projection',
+                             'rank_ecr':'ros_rank_ecr',
+                             'rank_min':'ros_rank_min',
+                             'rank_max':'ros_rank_max'},inplace=True)
+    
+    rankings = rankings.set_index('Player')
+    
+    rankings['ros_rank_max'] = pd.to_numeric(rankings['ros_rank_max'], errors='coerce')
+    rankings['ros_rank_min'] = pd.to_numeric(rankings['ros_rank_min'], errors='coerce')
+    rankings['ros_rank_ecr'] = pd.to_numeric(rankings['ros_rank_ecr'], errors='coerce')
+    
+    
+    rankings.index = rankings.index.str.replace(' II','',regex=True)
+    rankings.index = rankings.index.str.replace(' V','',regex=True)
+    rankings.index = rankings.index.str.replace(' IV','',regex=True)
+    rankings.index = rankings.index.str.replace(' Jr.','',regex=True)
+    rankings.index = rankings.index.str.replace('  ',' ',regex=True)
+    #rankings.index = rankings.index.str.replace(' .',' ',regex=True)
+    rankings = rankings[['ros_projection',
+                         'ros_rank_ecr',
+                         'ros_rank_min',
+                         'ros_rank_max',]]
+    return rankings
     
