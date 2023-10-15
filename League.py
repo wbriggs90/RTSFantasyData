@@ -33,15 +33,25 @@ class privateLeague():
     '''create an instance of a league for the current year.
     to change year use the setyear function '''
   
-    
+    #teams = {}
       
     def __init__(self, config):
         
         if leaguetype = 'RTS':
+            # get player data from RTS
+            RTSLeague.getRosters(config)
+            
+            
+            
+            
+        elif leaguetype = 'Yahoo':
+            # get roster data from yahoo
+            YahooLeague.getRosters(config)
+            
+            
             LID =config['RTS']['LID']
             if LID == 'ffff':
-                print('This is the wrong League ID for your league. you need to ', 
-                      'change the contents of your config file')
+                print('you need to change the contents of your config file')
                 print()
                 raise ConfigError
             
@@ -49,8 +59,8 @@ class privateLeague():
             X = config['RTS']['X']
             TID = config['RTS']['TID']
             REALTIME = config['RTS']['REALTIME']
-            self.season = config['RTS']['Season']
-            self.MyTeamName = config['RTS']['MyTeamName']
+            Season = config['RTS']['Season']
+            MyTeamName = config['RTS']['MyTeamName']
             FPKey = config['RTS']['FPKey']
             directory = 'cached-rankings-data'
             self.league_id = LID
@@ -69,6 +79,12 @@ class privateLeague():
             for slotid in self.slotnames:
                 self.slotvalues[self.slotnames[slotid]]=slotid
             self.rosters = {}
+            self.teams = {}
+            self.rosterFormat = {}
+            self.leaguesettings = None
+            self.boxscore = None
+            self.season = Season
+            self.MyTeamName = MyTeamName
             print()
             print('Getting the current Week')
             self.setCurrentWeek()
@@ -114,23 +130,22 @@ class privateLeague():
     #%% SET VALUES
         
     def setCurrentWeek(self):
-       data = requests.get(self.url +'football/lineup.php',
-                           params=self.parameters,
-                           cookies=self.cookies)
-       if data == None:
-           print("Failed to get Current Week")
-           
-       soup = BeautifulSoup(data.content, 'html.parser')
-       
-       week = soup.find(class_='header-notes hidden-tn')
-       print(week.string)
-       if week.string[5:14]=='Preseason':
-           print('setting week as week 0...')
-           currentweek = 0
-       else:
-           currentweek = int(week.string[10:12])
-       self.CurrentWeek = currentweek
-       return      
+        # Find the first Monday of September for the current year.
+        year = datetime.now().year
+        first_monday = datetime(year, 9, 1)  # Start on September 1st.
+        while first_monday.weekday() != 0:  # 0 corresponds to Monday.
+            first_monday += timedelta(days=1)
+        day1 = first_monday + timedelta(days=1)
+        # Calculate the number of days that have passed since the first Monday of September.
+        days_passed = (current_date - day1).days
+        
+        # Calculate the NFL week, considering that each week starts on Tuesday.
+        nfl_week = (days_passed // 7)+1
+        if nfl_week<0:
+            nfl_week = 0
+        self.CurrentWeek = nfl_week
+        return
+    
     #%% GET RTS DATA
     def getTransactions(self,Week):
         '''

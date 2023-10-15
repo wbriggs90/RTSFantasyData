@@ -175,7 +175,7 @@ def getWeeklyECR(FPKey,directory,week):
     rankings.index = rankings.index.str.replace(' IV','',regex=True)
     rankings.index = rankings.index.str.replace(' Jr.','',regex=True)
     rankings.index = rankings.index.str.replace('  ',' ',regex=True)
-    #rankings.index = rankings.index.str.replace(' .',' ',regex=True)
+    rankings.index = rankings.index.str.replace('.','',regex=True)
     rankings = rankings[['Weekly Projection',
                          'Weekly ECR',
                          'weekly_rank_min',
