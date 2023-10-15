@@ -34,7 +34,6 @@ class privateLeague():
     '''create an instance of a league for the current year.
     to change year use the setyear() function '''
   
-    #teams = {}
       
     def __init__(self, config):
         
@@ -95,7 +94,9 @@ class privateLeague():
         self.Players.sort_values(by='ros_rank_ecr',inplace=True)
         self.Players['ros_projection'] = pd.to_numeric(self.Players['ros_projection'], errors='coerce')
         self.Players['Weekly Projection'] = pd.to_numeric(self.Players['Weekly Projection'], errors='coerce')
+        
         #if any of the weekly rankings are NaN then replace them with the ROS ranking
+        # this actually isn't that good because if weekly is NaN then that usually means inactive or BYE.
         self.Players['weekly_rank_min'].fillna(self.Players['ros_rank_ecr'], inplace=True)
         self.Players['weekly_rank_max'].fillna(self.Players['ros_rank_ecr'], inplace=True)
         self.Players['Weekly ECR'].fillna(self.Players['ros_rank_ecr'], inplace=True)
