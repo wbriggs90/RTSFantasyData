@@ -185,7 +185,7 @@ def getROSECR(FPKey,directory):
     headers = {'x-api-key': FPKey}
 
     #  'valid_format': 'QB, RB, WR, TE, K, OP, FLX, DST, IDP, DL, LB, DB, TK, TQB, TRB, TWR, TTE, TOL, HC, P'}
-    positions = ['qb','rb','wr','te','k','dst']
+    positions = ['QB','RB','WR','TE','K','DST']
     datadict = {}
     rankings = pd.DataFrame()
         
@@ -229,7 +229,7 @@ def getROSECR(FPKey,directory):
                 
                 
         else:
-            print("The data is NOT older than 30 minutes.")
+            
             print("using Loaded data")
         
         playerdata = data['players']
@@ -239,10 +239,17 @@ def getROSECR(FPKey,directory):
         
         print('saving player data to csv')
         df = pd.DataFrame(playerdata)
-        df.set_index('player_name')
-        df.to_csv(filename)
-    
         
+        
+        #some positions return different parameter names...
+        try:
+            df.set_index('player_name')
+        except:
+            df.set_index('name')
+        df.to_csv(filename)
+       
+        
+     
         #append this data to the output
         rankings = pd.concat([df,rankings])
         print()
@@ -250,11 +257,18 @@ def getROSECR(FPKey,directory):
         
     #return the rankings dataframe
     rankings.to_csv(os.path.join(directory,'ROS-rankings.csv') )
-    rankings.rename(columns={'player_name':'Player',
-                             'r2p_pts':'ros_projection',
-                             'rank_ecr':'ros_rank_ecr',
-                             'rank_min':'ros_rank_min',
-                             'rank_max':'ros_rank_max'},inplace=True)
+    try:
+        rankings.rename(columns={'player_name':'Player',
+                                 'r2p_pts':'ros_projection',
+                                 'rank_ecr':'ros_rank_ecr',
+                                 'rank_min':'ros_rank_min',
+                                 'rank_max':'ros_rank_max'},inplace=True)
+    except:
+        rankings.rename(columns={'name':'Player',
+                                 'r2p_pts':'ros_projection',
+                                 'rank_ecr':'ros_rank_ecr',
+                                 'rank_min':'ros_rank_min',
+                                 'rank_max':'ros_rank_max'},inplace=True)
     
     rankings = rankings.set_index('Player')
     
