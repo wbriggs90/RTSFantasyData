@@ -24,3 +24,5 @@ cached-rankings-data/k.csv
 cached-rankings-data
 private.json
 config_private_yahoo.ini
+plots.pdf
+auth/token.json
